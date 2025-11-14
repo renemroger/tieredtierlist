@@ -309,22 +309,54 @@ Beyond just likes, consider:
 ## 3. Technical Architecture
 
 ### 3.1 Technology Stack
-- **Frontend**: Next.js 15 (App Router), React 19, TypeScript
+
+**Architecture**: Next.js Full-Stack (Frontend + Backend in one codebase)
+
+```
+┌─────────────────────────────────────┐
+│     Next.js 15 (App Router)         │
+│  ┌─────────────┬─────────────────┐  │
+│  │  Frontend   │   API Routes    │  │
+│  │  (React 19) │  (/app/api/*)   │  │
+│  └─────────────┴─────────────────┘  │
+│           │              │           │
+│           │          Prisma          │
+│           │              │           │
+└───────────┴──────────────┴───────────┘
+                    │
+              Supabase (PostgreSQL)
+```
+
+**Core Stack**:
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Backend**: Next.js API Routes (NO separate backend server)
+- **Frontend**: React 19
 - **Styling**: Tailwind CSS
-- **State Management**: React Context API or Zustand (for complex state)
+- **State Management**: Zustand (for complex state like template editor)
+- **Database**: PostgreSQL via Supabase (better free tier and scaling)
+- **ORM**: Prisma (with Prisma Studio for visual DB management)
+- **Authentication**: NextAuth.js with Google OAuth Provider only (MVP)
+
+**UI Libraries**:
 - **Drag & Drop**: @dnd-kit/core (modern, accessible, performant)
-- **Animations**: Framer Motion or CSS transitions
-- **Image Handling**: Next.js Image optimization
-- **Database**: PostgreSQL (via Supabase - better free tier and scaling)
-- **ORM**: Prisma or Drizzle ORM with database constraints
-- **Authentication**: NextAuth.js with Google OAuth Provider
-- **Storage**: Vercel Blob (start) or AWS S3 for image uploads
-- **AI/LLM**: Anthropic Claude API (cost-effective) or OpenAI GPT-4 API
-- **Ad Networks**: Google AdSense, Media.net, or custom affiliate integration
-- **Background Jobs**: Vercel Cron (free tier)
-- **Email**: Resend or SendGrid (free tier initially)
+- **Animations**: Framer Motion
+- **Forms**: React Hook Form + Zod validation
+- **Image Handling**: Next.js Image component (automatic optimization)
+
+**Services & Infrastructure**:
 - **Deployment**: Vercel
+- **Storage**: Vercel Blob (start) → AWS S3 (at scale)
+- **AI/LLM**: Anthropic Claude API (cost-effective, featured templates only)
+- **Ad Networks**: Google AdSense (+ affiliate links)
+- **Background Jobs**: Vercel Cron (free tier)
+- **Email**: Resend (free tier: 3,000/month)
 - **Monitoring**: Vercel Analytics + Sentry (optional)
+
+**Mobile Strategy**:
+- **NO Native Mobile App**: Responsive web design + PWA
+- **PWA**: Progressive Web App with manifest.json
+- **Mobile-Optimized**: Touch-friendly UI, mobile-first Tailwind breakpoints
 
 ### 3.2 Data Models
 
@@ -1233,11 +1265,27 @@ Sitemap: https://tieredtierlist.com/sitemap.xml
 4. **Scalability**: System remains economical as platform grows
 5. **Better ROI**: Premium ads on featured templates generate more revenue than generic ads on all templates
 
-### 7.3 Mobile App
-- Native iOS/Android apps
-- Offline mode
-- Push notifications for new templates
-- Mobile-optimized creator tools
+### 7.3 Mobile Strategy (Web-First)
+
+**Current Approach: NO Native Mobile App**
+- Responsive web design (Tailwind CSS)
+- Progressive Web App (PWA) with manifest.json
+- Mobile-optimized UI components
+- Touch-friendly weight sliders and interactions
+- Mobile-first development approach
+
+**Why Web-First**:
+- Single codebase to maintain
+- Instant updates (no app store approval)
+- Lower development cost (save 6-12 months dev time)
+- Users can "Add to Home Screen" via PWA
+- TierMaker and similar platforms work great on mobile web
+
+**Future Native App Consideration** (Phase 3+):
+- Only if users actively request it
+- Only after validating product-market fit on web
+- Only if revenue supports hiring mobile developers
+- Would require React Native or separate iOS/Android codebases
 
 ## 8. Success Metrics
 
@@ -1303,11 +1351,12 @@ Sitemap: https://tieredtierlist.com/sitemap.xml
 
 ---
 
-**Document Version**: 1.3
+**Document Version**: 1.4
 **Last Updated**: 2025-11-13
 **Author**: Technical Design based on initial concept discussion
 
 **Changelog**:
+- v1.4 (2025-11-13): **FINAL architecture decisions**: Backend (Next.js API Routes only, NO separate server), ORM (Prisma), Mobile (PWA/responsive web, NO native app). Updated technology stack section.
 - v1.3 (2025-11-13): Added comprehensive sections: Scaling & Performance (10k users), Template Constraints (conservative limits), Authentication (Google OAuth only), Content Moderation (flag/report system), SEO Strategy (detailed implementation), Cost breakdown
 - v1.2 (2025-11-13): **Important constraint**: AI analysis only for featured templates (cost optimization)
 - v1.1 (2025-11-13): Added AI-powered content analysis & contextual advertising, Featured tier lists system, expanded monetization strategy

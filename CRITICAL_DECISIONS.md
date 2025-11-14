@@ -73,7 +73,106 @@ Based on TierMaker patterns, expandable as platform grows.
 
 ---
 
-## 4. Content Moderation
+## 4. Backend Architecture & ORM
+
+### Decision: Next.js API Routes + Prisma (NO Separate Backend)
+
+**Architecture**:
+```
+┌─────────────────────────────────────┐
+│     Next.js 15 (App Router)         │
+│  ┌─────────────┬─────────────────┐  │
+│  │  Frontend   │   API Routes    │  │
+│  │  (React)    │  (/app/api/*)   │  │
+│  └─────────────┴─────────────────┘  │
+│           │              │           │
+│           │          Prisma          │
+│           │              │           │
+└───────────┴──────────────┴───────────┘
+                    │
+              Supabase (PostgreSQL)
+```
+
+### Why NO Separate Backend Server?
+
+**Rationale**:
+- ✅ **Single Codebase**: Easier to maintain, fewer moving parts
+- ✅ **Shared Types**: Frontend and API share TypeScript types
+- ✅ **Simpler Deployment**: One Vercel deploy (automatic)
+- ✅ **Lower Costs**: No separate backend hosting ($0 saved/month)
+- ✅ **Built-in Serverless**: Next.js API routes are serverless functions
+- ✅ **Faster Development**: No CORS, API contracts, or separate repos
+- ✅ **Edge-Ready**: Can deploy API routes to edge if needed
+
+**When You'd Need a Separate Backend** (Not your case):
+- Real-time WebSockets (Supabase Realtime handles this)
+- Heavy background processing (Vercel Cron works fine)
+- Multiple client platforms (you're web-only)
+- Microservices at massive scale (way premature)
+
+### ORM Choice: Prisma
+
+**Decision**: Prisma over Drizzle
+
+**Rationale**:
+1. **Better Developer Experience**: Prisma Studio GUI for database visualization
+2. **Faster Prototyping**: Intuitive schema, straightforward migrations
+3. **More Resources**: Extensive docs, tutorials, community support
+4. **Easier Debugging**: Clear error messages, great documentation
+5. **Proven with Supabase**: Well-tested integration
+6. **Can Migrate Later**: If performance becomes critical, switch to Drizzle
+
+**Prisma Advantages**:
+- Auto-generated TypeScript types
+- Built-in migration system
+- Prisma Studio (visual database editor)
+- Great with Next.js App Router
+- Smaller learning curve
+
+**Drizzle Advantages** (Why NOT chosen for MVP):
+- Slightly better performance (not bottleneck for you)
+- Smaller bundle size (edge optimization)
+- More SQL-like API (steeper learning curve)
+
+**Example Prisma Schema**:
+```prisma
+model Template {
+  id          String   @id @default(cuid())
+  title       String   @db.VarChar(100)
+  description String   @db.VarChar(500)
+  likeCount   Int      @default(0)
+  isFeatured  Boolean  @default(false)
+
+  creator     User     @relation(fields: [creatorId], references: [id])
+  creatorId   String
+  items       Item[]
+  attributes  Attribute[]
+
+  @@index([creatorId])
+  @@index([isFeatured])
+}
+```
+
+**Example Next.js API Route**:
+```typescript
+// app/api/templates/route.ts
+import { prisma } from '@/lib/prisma'
+
+export async function GET() {
+  const templates = await prisma.template.findMany({
+    where: { isPublic: true },
+    include: { creator: true },
+    orderBy: { likeCount: 'desc' },
+    take: 20
+  })
+
+  return Response.json(templates)
+}
+```
+
+---
+
+## 5. Content Moderation
 
 ### Flag/Report System
 
@@ -103,7 +202,65 @@ Based on TierMaker patterns, expandable as platform grows.
 
 ---
 
-## 5. AI Content Analysis
+## 6. Mobile Strategy
+
+### Decision: NO Native Mobile App - Responsive Web + PWA
+
+**Rationale**:
+- ❌ **Complexity Explosion**: 2-3x development time, multiple codebases
+- ❌ **App Store Gatekeeping**: Approval delays, review process
+- ❌ **Harder Iteration**: Can't deploy instantly, must wait for reviews
+- ❌ **Learning Curve**: Would need to learn React Native or native development
+- ✅ **Mobile Web Works Great**: TierMaker and similar platforms are web-only
+- ✅ **PWA = "Native Feel"**: Users can install to home screen
+- ✅ **Instant Updates**: No app store approval needed
+- ✅ **Single Codebase**: Responsive design works on all devices
+
+**Instead: Mobile-Optimized Web**:
+1. **Responsive Design**:
+   - Tailwind breakpoints (sm:, md:, lg:)
+   - Touch-friendly weight sliders
+   - Mobile-optimized tier layout
+   - Fast load times on mobile networks
+
+2. **Progressive Web App (PWA)**:
+   ```json
+   // public/manifest.json
+   {
+     "name": "TieredTierList",
+     "short_name": "TTL",
+     "icons": [...],
+     "start_url": "/",
+     "display": "standalone",
+     "theme_color": "#000000"
+   }
+   ```
+   - Users can "Add to Home Screen"
+   - Feels like native app
+   - Works offline (optional service worker)
+   - No app store needed
+
+3. **Mobile-First Features**:
+   - Touch gestures for weight adjustment
+   - Swipe interactions
+   - Mobile-optimized template creator
+   - Bottom sheet modals (mobile UX pattern)
+
+**When to Reconsider Native Mobile** (Phase 3+):
+- ⚠️ Only if users actively request it
+- ⚠️ Only if you have revenue to hire mobile devs
+- ⚠️ Only after validating product-market fit on web
+- ⚠️ Only if analytics show high mobile usage
+
+**Savings by Skipping Mobile App**:
+- **Development Time**: 6-12 months saved
+- **Development Cost**: $0 (vs $50k-100k to outsource)
+- **Maintenance**: Half the work (one codebase vs three)
+- **Deployment**: Simple (one platform vs three)
+
+---
+
+## 7. AI Content Analysis
 
 ### Featured Templates Only
 **Critical Cost Optimization**: AI analysis performed **only on featured templates** (100+ likes)
@@ -125,7 +282,7 @@ Based on TierMaker patterns, expandable as platform grows.
 
 ---
 
-## 6. Featured Tier Lists
+## 8. Featured Tier Lists
 
 ### Dynamic Threshold System
 
@@ -152,7 +309,7 @@ Growth Factor = (Total Users / 1000) × 0.1
 
 ---
 
-## 7. SEO Strategy
+## 9. SEO Strategy
 
 ### URL Structure
 ```
@@ -187,34 +344,56 @@ Featured:  /featured
 
 ---
 
-## 8. Technology Stack
+## 10. Technology Stack
 
-### Core
+### Core Stack (FINAL)
+```
+┌─────────────────────────────────────┐
+│     Next.js 15 (App Router)         │
+│  ┌─────────────┬─────────────────┐  │
+│  │  Frontend   │   API Routes    │  │
+│  │  (React 19) │  (/app/api/*)   │  │
+│  └─────────────┴─────────────────┘  │
+│           │              │           │
+│           │          Prisma          │
+│           │              │           │
+└───────────┴──────────────┴───────────┘
+                    │
+              Supabase (PostgreSQL)
+```
+
 - **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
+- **Backend**: Next.js API Routes (NO separate server)
 - **Database**: PostgreSQL (Supabase)
-- **ORM**: Prisma or Drizzle
+- **ORM**: Prisma (with Prisma Studio)
 - **Auth**: NextAuth.js + Google OAuth
 - **Deployment**: Vercel
 
 ### Services
 - **Storage**: Vercel Blob → AWS S3 (at scale)
-- **AI**: Anthropic Claude API
+- **AI**: Anthropic Claude API (cost-effective)
 - **Ads**: Google AdSense
-- **Email**: Resend or SendGrid
-- **Jobs**: Vercel Cron
-- **Monitoring**: Vercel Analytics + Sentry
+- **Email**: Resend or SendGrid (free tier)
+- **Jobs**: Vercel Cron (free tier)
+- **Monitoring**: Vercel Analytics + Sentry (optional)
 
-### Libraries
-- **State**: Zustand or React Context
+### Frontend Libraries
+- **State Management**: Zustand or React Context
 - **Animations**: Framer Motion
 - **Drag & Drop**: @dnd-kit/core
 - **Images**: Next.js Image (automatic optimization)
+- **Forms**: React Hook Form + Zod validation
+
+### Mobile Strategy
+- **NO Native App**: Responsive web + PWA
+- **PWA**: manifest.json + optional service worker
+- **Touch Optimized**: Mobile-friendly UI components
 
 ---
 
-## 9. Monetization Strategy
+## 11. Monetization Strategy
 
 ### Primary Revenue (Immediate)
 1. **Contextual Ads** - Featured templates only
@@ -248,7 +427,7 @@ Featured:  /featured
 
 ---
 
-## 10. Cost Projections
+## 12. Cost Projections
 
 ### Phase 1: MVP (Months 1-6)
 - **Users**: 0-1,000
@@ -293,7 +472,7 @@ Featured:  /featured
 
 ---
 
-## 11. Key Architectural Decisions
+## 13. Key Architectural Decisions
 
 ### Performance Optimizations
 1. **Caching**:
@@ -325,7 +504,7 @@ Featured:  /featured
 
 ---
 
-## 12. Development Phases
+## 14. Development Phases
 
 ### MVP (Phase 1)
 **Goal**: Prove core concept works
@@ -373,7 +552,7 @@ Featured:  /featured
 
 ---
 
-## 13. Success Metrics
+## 15. Success Metrics
 
 ### Engagement
 - Templates created/week
@@ -404,7 +583,7 @@ Featured:  /featured
 
 ---
 
-## 14. Open Questions / Future Decisions
+## 16. Open Questions / Future Decisions
 
 ### To Decide Later
 - [ ] Specific profanity filter implementation
@@ -428,10 +607,13 @@ Featured:  /featured
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
+| **Backend** | Next.js API Routes only | Single codebase, simpler, cheaper |
+| **ORM** | Prisma | Better DX, Prisma Studio, great docs |
 | **Auth** | Google OAuth only | Reduce spam, simple MVP |
 | **Database** | Supabase + Prisma | Better free tier, great scaling |
 | **AI** | Featured only (100+ likes) | 90% cost savings, quality focus |
 | **Hosting** | Vercel | Perfect Next.js integration, free tier |
+| **Mobile** | Responsive web + PWA | No native app, save 6-12 months dev |
 | **Items/Template** | Max 50 (MVP) | Conservative start, TierMaker-based |
 | **Attributes/Template** | Max 8 (MVP) | Enough variety, avoid complexity |
 | **Moderation** | Manual (Phase 1) | Simple, you as admin initially |
@@ -441,6 +623,11 @@ Featured:  /featured
 
 ---
 
-**Document Version**: 1.0
-**Companion to**: TECHNICAL_DESIGN.md (v1.3)
+**Document Version**: 1.1
+**Last Updated**: 2025-11-13
+**Companion to**: TECHNICAL_DESIGN.md (v1.4)
 **Purpose**: Quick reference for critical decisions and constraints
+
+**Changelog**:
+- v1.1 (2025-11-13): Added Backend Architecture (Next.js API Routes only), ORM choice (Prisma), Mobile Strategy (PWA, no native app)
+- v1.0 (2025-11-13): Initial document with all critical decisions and constraints
