@@ -315,14 +315,16 @@ Beyond just likes, consider:
 - **Drag & Drop**: @dnd-kit/core (modern, accessible, performant)
 - **Animations**: Framer Motion or CSS transitions
 - **Image Handling**: Next.js Image optimization
-- **Database**: PostgreSQL (via Vercel Postgres or Supabase)
-- **ORM**: Prisma or Drizzle ORM
-- **Authentication**: NextAuth.js or Clerk
-- **Storage**: Vercel Blob or AWS S3 for image uploads
-- **AI/LLM**: Anthropic Claude API or OpenAI GPT-4 API for content analysis
+- **Database**: PostgreSQL (via Supabase - better free tier and scaling)
+- **ORM**: Prisma or Drizzle ORM with database constraints
+- **Authentication**: NextAuth.js with Google OAuth Provider
+- **Storage**: Vercel Blob (start) or AWS S3 for image uploads
+- **AI/LLM**: Anthropic Claude API (cost-effective) or OpenAI GPT-4 API
 - **Ad Networks**: Google AdSense, Media.net, or custom affiliate integration
-- **Background Jobs**: Vercel Cron or dedicated job queue (BullMQ/Redis)
+- **Background Jobs**: Vercel Cron (free tier)
+- **Email**: Resend or SendGrid (free tier initially)
 - **Deployment**: Vercel
+- **Monitoring**: Vercel Analytics + Sentry (optional)
 
 ### 3.2 Data Models
 
@@ -475,6 +477,567 @@ Beyond just likes, consider:
    - Client-side detection of user intent shift
    - Request different ad categories if needed
    - Example: User shifts to high "Price Value" → Show discount/deal ads
+
+### 3.4 Scaling & Performance Requirements
+
+#### Target Scale
+- **Concurrent Users**: 10,000
+- **Total Users**: 50,000+ (Year 1 goal)
+- **Templates**: 5,000-10,000
+- **Featured Templates**: 500-1,000 (5-10% of total)
+- **Page Views**: 500,000/month at scale
+
+#### Performance Targets
+- **Page Load Time**: < 2 seconds (First Contentful Paint)
+- **Time to Interactive**: < 3 seconds
+- **Animation Frame Rate**: 60fps for tier transitions
+- **API Response Time**: < 500ms (p95)
+- **Database Query Time**: < 100ms (p95)
+- **Image Load Time**: < 1 second (lazy loaded)
+
+#### Scaling Strategy
+1. **Database**:
+   - Start with Supabase free tier (500MB)
+   - Upgrade to Pro ($25/mo) at ~500 templates
+   - Connection pooling for efficiency
+   - Indexed queries on frequently accessed fields (templateId, creatorId, isFeatured)
+
+2. **Caching**:
+   - ISR (Incremental Static Regeneration) for template pages (revalidate: 1 hour)
+   - CDN caching for images
+   - Client-side caching for template data (React Query or SWR)
+   - Redis cache for featured templates list (optional, Phase 2)
+
+3. **Image Optimization**:
+   - Compress on upload (5MB → 1MB)
+   - Convert to WebP format
+   - Generate multiple sizes (thumbnail, medium, full)
+   - Lazy loading with Next.js Image component
+   - CDN delivery (automatic with Vercel)
+
+4. **Code Splitting**:
+   - Route-based code splitting (automatic with Next.js App Router)
+   - Dynamic imports for heavy components (chart libraries, etc.)
+   - Separate bundle for template creator (only loaded when creating)
+
+5. **Rate Limiting**:
+   - Template creation: 10 per day per user
+   - Like/comment: 100 per hour per user
+   - API requests: 1000 per hour per IP
+   - Prevents abuse and ensures fair resource usage
+
+### 3.5 Template Constraints & Validation
+
+**Conservative initial limits inspired by TierMaker, expandable based on platform performance.**
+
+#### Template Limits
+```typescript
+const TEMPLATE_CONSTRAINTS = {
+  // Template metadata
+  title: {
+    minLength: 10,
+    maxLength: 100,
+    required: true
+  },
+  description: {
+    minLength: 20,
+    maxLength: 500,
+    required: true
+  },
+  category: {
+    required: true,
+    // Pre-defined categories: Sports, Gaming, Food, Tech, Entertainment, etc.
+  },
+
+  // Items
+  items: {
+    min: 3,          // Minimum for meaningful tier list
+    max: 50,         // Start conservative, increase to 100 if performance allows
+    required: true
+  },
+
+  // Attributes
+  attributes: {
+    min: 2,          // At least 2 attributes for weighted ranking
+    max: 8,          // Start with 8, can increase to 10-12 later
+    required: true
+  },
+  attributeName: {
+    maxLength: 50
+  },
+
+  // Weight Presets
+  presets: {
+    min: 0,          // Optional
+    max: 5,          // Enough variety without overwhelming users
+  },
+  presetName: {
+    maxLength: 30
+  },
+
+  // Tiers
+  tiers: {
+    min: 3,          // Minimum for tier list
+    max: 8,          // S, A, B, C, D, E, F, G
+    default: 6       // S, A, B, C, D, F (traditional)
+  },
+
+  // Images
+  image: {
+    maxSize: 5 * 1024 * 1024,      // 5MB max upload
+    compressedSize: 1024 * 1024,    // 1MB after compression
+    formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
+    dimensions: {
+      min: 100,                      // Minimum 100x100px
+      max: 4096,                     // Maximum 4096x4096px
+      recommended: 800               // Recommend 800x800px
+    }
+  }
+}
+```
+
+#### Validation Rules
+1. **Template Creation**:
+   - Must have title, description, category
+   - Must have 2-8 attributes
+   - Must have 3-50 items
+   - Each item must have scores for all attributes
+   - Weights must sum to 100% (handled automatically)
+
+2. **Image Upload**:
+   - File size validation before upload
+   - Format validation (MIME type check)
+   - Dimension validation
+   - Automatic compression and WebP conversion
+   - Generate thumbnails (150x150, 400x400, 800x800)
+
+3. **Text Content**:
+   - XSS prevention (sanitize HTML)
+   - Profanity filter (basic, Phase 1)
+   - Length enforcement on all text fields
+
+4. **Rate Limiting**:
+   - Enforce limits at API level
+   - Return 429 Too Many Requests with retry-after header
+
+#### Database Constraints
+```sql
+-- Example Prisma schema constraints
+model Template {
+  title       String   @db.VarChar(100)
+  description String   @db.VarChar(500)
+
+  @@check(length(title) >= 10)
+  @@check(length(description) >= 20)
+}
+
+model Item {
+  name        String   @db.VarChar(100)
+
+  @@index([templateId])
+}
+
+model Attribute {
+  name        String   @db.VarChar(50)
+
+  @@index([templateId])
+}
+```
+
+### 3.6 Authentication Strategy
+
+#### Google OAuth Only (MVP)
+**Rationale**: Reduces spam, fake accounts, and simplifies initial implementation.
+
+#### Implementation
+- **Provider**: NextAuth.js with Google OAuth Provider
+- **User Model**:
+  ```typescript
+  {
+    id: string
+    email: string
+    name: string
+    image: string           // Google profile picture
+    googleId: string
+    createdAt: Date
+    emailVerified: boolean  // Auto-verified via Google
+
+    // User stats
+    templateCount: number
+    featuredCount: number
+    totalLikes: number
+
+    // Permissions
+    role: 'user' | 'moderator' | 'admin'
+    isBanned: boolean
+    banReason?: string
+  }
+  ```
+
+#### Authentication Flow
+1. User clicks "Sign in with Google"
+2. Redirect to Google OAuth consent screen
+3. Google returns user info (email, name, profile picture)
+4. Create or update user record in database
+5. Return JWT session token
+6. Store session in secure cookie
+
+#### Session Management
+- JWT tokens with 30-day expiration
+- Refresh tokens for extended sessions
+- Automatic session renewal on activity
+- Secure, httpOnly cookies
+
+#### Future OAuth Providers (Phase 2)
+- GitHub (developer community)
+- Discord (gaming community)
+- Facebook (broad reach)
+- Apple (iOS users)
+
+#### Permissions & Roles
+- **User**: Create templates, like, comment
+- **Moderator**: Review flagged content, ban users, feature templates
+- **Admin**: Full access, platform settings, analytics
+
+### 3.7 Content Moderation
+
+#### Flag/Report System
+
+**User-Initiated Reporting**:
+- Report button on templates and comments
+- Report categories:
+  - Inappropriate content
+  - Spam
+  - Copyright infringement
+  - Misleading information
+  - Harassment
+  - Other (with text explanation)
+
+**Report Model**:
+```typescript
+{
+  id: string
+  reporterId: string
+  targetType: 'template' | 'comment' | 'user'
+  targetId: string
+  category: ReportCategory
+  description: string
+  status: 'pending' | 'reviewing' | 'resolved' | 'dismissed'
+  createdAt: Date
+  reviewedBy?: string
+  reviewedAt?: Date
+  resolution?: string
+}
+```
+
+#### Moderation Queue
+
+**Phase 1 (Manual - You as Admin)**:
+- Admin dashboard showing all reports
+- Sort by: Date, Category, Reporter reputation
+- View context: Template/comment content, reporter history
+- Actions:
+  - Dismiss (false report)
+  - Warn user
+  - Remove content
+  - Ban user (temporary or permanent)
+  - Feature/unfeature template
+
+**Phase 2 (AI-Assisted)**:
+- AI pre-screens reports for obvious violations
+- Auto-flag templates with:
+  - Adult content (image recognition)
+  - Hate speech (text analysis)
+  - Spam patterns
+- Prioritize reports for human review
+- Suggest actions based on similar cases
+
+**Phase 3 (Community Moderation)**:
+- Trusted user program (high-reputation users)
+- Community voting on flagged content
+- Automatic actions based on community consensus
+
+#### Automated Filters (Phase 1)
+1. **Profanity Filter**:
+   - Basic word list filtering
+   - Applied to titles, descriptions
+   - Warning before publishing
+
+2. **Spam Detection**:
+   - Duplicate template detection (same items, attributes)
+   - Rapid template creation (rate limiting)
+   - Suspicious URLs in descriptions
+
+3. **Image Validation**:
+   - File type validation
+   - Size validation
+   - Basic inappropriate content detection (Phase 2 - AI)
+
+#### Google OAuth Benefits for Moderation
+- Real identity reduces spam and abuse
+- Email for notifications and warnings
+- Account suspension effective (can't easily create new accounts)
+- Reputation system tied to Google account
+
+### 3.8 SEO Strategy
+
+#### URL Structure (SEO-Friendly)
+```
+Homepage:              /
+Browse by category:    /category/sports
+                       /category/gaming
+Featured templates:    /featured
+Search results:        /search?q=climbing+shoes
+
+Template page:         /t/best-climbing-shoes-2025-abc123
+                       Format: /t/[slug]-[shortId]
+                       Slug: SEO-friendly, Short ID: unique identifier
+
+Creator profile:       /@johndoe
+User templates:        /@johndoe/templates
+
+Static pages:          /about
+                       /privacy
+                       /terms
+```
+
+**Benefits**:
+- Clean, readable URLs
+- Keywords in URL (slug)
+- Consistent structure
+- Easy to remember and share
+
+#### Server-Side Rendering Strategy
+
+**ISR (Incremental Static Regeneration)**:
+- Template pages: Revalidate every 1 hour
+- Category pages: Revalidate every 30 minutes
+- Homepage: Revalidate every 15 minutes
+- Featured page: Revalidate every 30 minutes
+
+**Benefits**:
+- Fast initial load (static HTML)
+- SEO-friendly (Google sees content immediately)
+- Automatic updates without full rebuild
+- Reduced server load
+
+**SSR (Server-Side Rendering)**:
+- Search results page
+- User profiles (fresh data)
+- Admin pages
+
+#### Metadata & Open Graph
+
+**Template Page Example**:
+```typescript
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const template = await getTemplate(params.id)
+
+  return {
+    title: `${template.title} - Weighted Tier List | TieredTierList`,
+    description: template.description.slice(0, 160),
+    keywords: [template.category, ...template.tags, 'tier list', 'ranking'],
+
+    openGraph: {
+      title: template.title,
+      description: template.description,
+      images: [
+        {
+          url: `/api/og-image/${template.id}`, // Auto-generated screenshot
+          width: 1200,
+          height: 630,
+          alt: template.title
+        }
+      ],
+      type: 'website',
+    },
+
+    twitter: {
+      card: 'summary_large_image',
+      title: template.title,
+      description: template.description,
+      images: [`/api/og-image/${template.id}`],
+    },
+  }
+}
+```
+
+#### Structured Data (Schema.org JSON-LD)
+
+**Template Page Structured Data**:
+```typescript
+{
+  "@context": "https://schema.org",
+  "@type": "CreativeWork",
+  "name": "Best Climbing Shoes 2025",
+  "description": "Compare climbing shoes by performance, comfort...",
+  "author": {
+    "@type": "Person",
+    "name": "John Doe"
+  },
+  "datePublished": "2025-01-15",
+  "dateModified": "2025-01-20",
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "4.8",
+    "ratingCount": "127",  // Based on likes
+    "bestRating": "5",
+    "worstRating": "1"
+  },
+  "keywords": "climbing shoes, tier list, ranking, sports gear"
+}
+```
+
+**Benefits**:
+- Rich snippets in search results
+- Better understanding by search engines
+- Potential for enhanced SERP features
+
+#### Dynamic Sitemap Generation
+
+**Implementation**:
+```typescript
+// app/sitemap.ts
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const templates = await getAllPublicTemplates()
+
+  return [
+    { url: 'https://tieredtierlist.com', priority: 1.0, changeFrequency: 'daily' },
+    { url: 'https://tieredtierlist.com/featured', priority: 0.9, changeFrequency: 'daily' },
+
+    // Category pages
+    ...categories.map(cat => ({
+      url: `https://tieredtierlist.com/category/${cat.slug}`,
+      priority: 0.8,
+      changeFrequency: 'daily'
+    })),
+
+    // Template pages
+    ...templates.map(template => ({
+      url: `https://tieredtierlist.com/t/${template.slug}-${template.shortId}`,
+      lastModified: template.updatedAt,
+      priority: template.isFeatured ? 0.9 : 0.7,
+      changeFrequency: 'weekly'
+    }))
+  ]
+}
+```
+
+**Update Frequency**:
+- Regenerate sitemap daily (via cron job)
+- Submit to Google Search Console
+- Include in robots.txt
+
+#### robots.txt
+```
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+
+Sitemap: https://tieredtierlist.com/sitemap.xml
+```
+
+#### Content Strategy for SEO
+
+1. **Encourage Descriptive Titles**:
+   - Show character counter (10-100 chars)
+   - Suggest format: "[Topic] - [Year] - [Adjective]"
+   - Example: "Best Climbing Shoes 2025 - Comprehensive Guide"
+
+2. **Rich Descriptions**:
+   - Minimum 20 characters
+   - Show examples of good descriptions
+   - Include relevant keywords naturally
+
+3. **Category Selection**:
+   - Pre-defined categories for consistency
+   - Help Google understand content type
+   - Enable category-specific landing pages
+
+4. **Tags**:
+   - Auto-suggest popular tags
+   - Limit to 5-10 tags
+   - Improve discoverability
+
+#### Performance Optimization (SEO Factor)
+
+1. **Core Web Vitals**:
+   - LCP (Largest Contentful Paint): < 2.5s ✓
+   - FID (First Input Delay): < 100ms ✓
+   - CLS (Cumulative Layout Shift): < 0.1 ✓
+
+2. **Image Optimization**:
+   - Next.js Image component (automatic)
+   - WebP format
+   - Lazy loading
+   - Proper alt text for accessibility and SEO
+
+3. **Mobile Optimization**:
+   - Responsive design (Tailwind CSS)
+   - Touch-friendly controls
+   - Fast mobile load times
+   - Mobile-first indexing ready
+
+#### Internal Linking
+
+1. **Related Templates**:
+   - "Similar tier lists you might like"
+   - Based on category, tags, creator
+   - Helps Google discover and crawl content
+
+2. **Category Pages**:
+   - Link to all templates in category
+   - Breadcrumb navigation
+   - Improves site structure
+
+3. **Creator Profiles**:
+   - Links to all creator's templates
+   - Builds authority for popular creators
+
+#### Social Signals
+
+1. **Share Buttons**:
+   - Twitter, Reddit, Discord, Facebook
+   - Pre-filled share text with template title
+   - Trackable share links
+
+2. **Auto-Generated OG Images**:
+   - Screenshot of tier list with current weights
+   - Brand watermark
+   - Visually appealing for social shares
+
+3. **Embeds**:
+   - iframe embed code for blogs/websites
+   - Creates backlinks
+   - Increases visibility
+
+#### SEO Quick Wins Checklist
+
+**MVP (Phase 1)**:
+- ✓ Clean URL structure with slugs
+- ✓ ISR for template pages
+- ✓ Basic meta tags (title, description)
+- ✓ Open Graph tags
+- ✓ Twitter cards
+- ✓ Dynamic sitemap
+- ✓ robots.txt
+- ✓ Mobile-responsive design
+- ✓ Fast load times (< 2s)
+
+**Phase 2**:
+- ⚠ Structured data (JSON-LD)
+- ⚠ Auto-generated OG images
+- ⚠ Internal linking system
+- ⚠ Category landing pages with rich content
+- ⚠ Blog/content marketing
+
+**Phase 3**:
+- ⚠ Backlink building
+- ⚠ Guest posting
+- ⚠ Partnerships with niche communities
+- ⚠ Regular content updates
 
 ## 4. MVP Scope (Proof of Concept)
 
@@ -740,11 +1303,12 @@ Beyond just likes, consider:
 
 ---
 
-**Document Version**: 1.2
+**Document Version**: 1.3
 **Last Updated**: 2025-11-13
 **Author**: Technical Design based on initial concept discussion
 
 **Changelog**:
+- v1.3 (2025-11-13): Added comprehensive sections: Scaling & Performance (10k users), Template Constraints (conservative limits), Authentication (Google OAuth only), Content Moderation (flag/report system), SEO Strategy (detailed implementation), Cost breakdown
 - v1.2 (2025-11-13): **Important constraint**: AI analysis only for featured templates (cost optimization)
 - v1.1 (2025-11-13): Added AI-powered content analysis & contextual advertising, Featured tier lists system, expanded monetization strategy
 - v1.0 (2025-11-13): Initial document with core features, weighted attributes, and basic architecture
