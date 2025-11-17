@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Required Reading
+
+**IMPORTANT**: At the start of every new session, always read all documents in the `documents/` folder. These files contain critical technical decisions, architecture documentation, and project requirements that must inform all development work.
+
+Documents to review:
+- Technical design specifications
+- Architecture decisions
+- TODO lists and project roadmap
+- API contracts and data models
+- Any other planning or specification documents
+
 ## Project Overview
 
 This is a Next.js 15 application using the App Router, TypeScript, and Tailwind CSS. The project aims to create a tier list creation and sharing application.
