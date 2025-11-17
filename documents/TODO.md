@@ -1,7 +1,7 @@
 # Project TODO & Progress Tracker
 
-**Last Updated**: 2025-11-13
-**Next Session Focus**: Continue defining requirements and refining specifications
+**Last Updated**: 2025-11-16
+**Next Session Focus**: Database schema design and technical implementation planning
 
 ---
 
@@ -39,189 +39,203 @@
 
 ---
 
-## 🔄 Next Session: Continue Defining Requirements
+## ✅ Completed (Session 2)
 
-### High Priority - Requirements to Define
+### Major Architecture Refinement
+- [x] **Dual-Entity Model Finalized**: Templates (blueprints) vs Tier Lists (instances)
+- [x] **Preset Ownership**: Moved presets from templates to tier lists (domain expert should define perspectives)
+- [x] **Template Versioning**: Frozen on first reference, versioning strategy defined
+- [x] **Dual Creator Attribution**: Both template and tier list creators get credit
+- [x] **Template Limits**: Gamification system (5 base, +1 per 20-25 refs, cap 20-25 free tier)
 
-#### 1. User Experience & UI/UX Details
-- [ ] **Homepage Design**
-  - What content appears on homepage?
-  - Featured templates carousel?
-  - Category grid?
-  - Search bar prominence?
-  - Call-to-action (Create Template button)?
+### Complete Requirements Documentation
+- [x] Created comprehensive REQUIREMENTS.md (v1.0)
+- [x] Defined all 10 requirement categories systematically
+- [x] Established design principles (Minimal & Elegant, Apple-inspired)
+- [x] Dark mode primary with theme system for future modes
 
-- [ ] **Template Viewer Page Layout**
-  - Where do tier visuals appear?
-  - Weight sliders: sidebar vs bottom?
-  - Item details on hover or click?
-  - How to show attribute values per item?
-  - Social sharing button placement?
-  - Like button interaction?
+### UI/UX Requirements Defined
+- [x] **Homepage Design**: Categories, featured lists, verified creators section
+- [x] **Template Viewer Page**: Layout principles and interaction patterns
+- [x] **Template Creator Flow**: 3-day draft expiration, auto-save, TierMaker-style patterns
+- [x] **Weight Adjustment**: Sliders + inputs, "SQUISH" button to normalize to 100%
+- [x] **Tier Visualization**: Custom labels, dynamic thresholds, image-only items
 
-- [ ] **Template Creator Flow**
-  - Multi-step wizard or single page?
-  - How many steps? (e.g., 1. Details, 2. Attributes, 3. Items, 4. Presets, 5. Publish)
-  - Can users save drafts?
-  - Preview mode during creation?
-  - Bulk import for items? (CSV, JSON?)
+### Feature Requirements Defined
+- [x] **Attribute System**: Numeric (0-100 default, custom scales), Binary (Yes/No)
+- [x] **Weight Presets**: 0-5 per tier list, defined by tier list creator
+- [x] **Category System**: 10 categories with 5 subcategories each
+- [x] **Search & Discovery**: Browse-focused (no direct search MVP), trending/new/popular/featured pages
+- [x] **Social Features**: Likes on both entities, sharing with weight configs, public/private profiles
 
-- [ ] **Weight Adjustment Interaction**
-  - Sliders, number inputs, or percentage inputs?
-  - Show remaining percentage budget?
-  - Real-time preview as weights change?
-  - "Reset to default" button?
-  - Save custom weight configurations?
+### User Workflows Defined
+- [x] Workflow A: Create public template (blueprint sharing)
+- [x] Workflow B: Create tier list from template (community participation)
+- [x] Workflow C: Create private template + tier list (single-use)
+- [x] Workflow D: Fan → Influencer collaboration (network effects)
+- [x] Removed template forking from MVP (Phase 2 feature)
 
-#### 2. Tier Visualization Details
-- [ ] **Tier Display Options**
-  - Horizontal rows (traditional) or vertical columns?
-  - Items as cards, icons, or images only?
-  - Show scores on each item?
-  - Show tier thresholds?
-  - Drag items between tiers manually?
-  - Collapsed vs expanded view?
+### Influencer Strategy
+- [x] Verified creator badges (Twitch OAuth MVP)
+- [x] Featured creators section on homepage
+- [x] Social links on profiles (Twitch, YouTube, Twitter/X, Instagram, TikTok)
+- [x] Dual attribution drives network effects
 
-- [ ] **Animation Specifications**
-  - What triggers animations? (weight change, preset selection)
-  - Duration of transitions? (200ms, 500ms?)
-  - Animation type? (slide, fade, scale?)
-  - Stagger delay for multiple items moving?
-  - Mobile-specific animations?
+---
 
-#### 3. Attribute System Details
-- [ ] **Numeric Attributes**
-  - Default scale: 0-10 or 0-100?
-  - Allow custom scales per attribute?
-  - Decimal values allowed? (e.g., 7.5)
-  - Visual input: slider, number input, or stars?
+## 🔄 Next Session: Database Schema & Technical Planning
 
-- [ ] **Binary Attributes**
-  - How are they displayed? (checkbox, toggle, yes/no?)
-  - How are they weighted? (0 or 1, or custom weights?)
-  - Should they affect score differently than numeric?
+### High Priority Tasks
 
-- [ ] **Attribute Metadata**
-  - Attribute descriptions/tooltips mandatory?
-  - Attribute icons/emoji support?
-  - Can attributes be marked as "more important" visually?
-  - Units for attributes? (e.g., "Price: $", "Weight: lbs")
+#### 1. Database Schema Design (Prisma)
+- [ ] **Core Models**
+  - User model (Google OAuth, profile data, social links)
+  - Template model (items, attributes, versioning)
+  - TierList model (ratings, presets, references)
+  - Category & Subcategory models
+  - Like model (polymorphic for templates and tier lists)
 
-#### 4. Weight Preset System
-- [ ] **Preset Creation**
-  - How does creator define presets during template creation?
-  - Preview each preset before publishing?
-  - Can presets be added after template is published?
-  - Preset icons/badges?
+- [ ] **Relationships**
+  - User → Templates (one-to-many)
+  - User → TierLists (one-to-many)
+  - Template → TierLists (one-to-many, versioned references)
+  - Template ↔ Category (many-to-one)
+  - User ↔ Likes (many-to-many through Like model)
+  - Template ↔ Likes (many-to-many)
+  - TierList ↔ Likes (many-to-many)
 
-- [ ] **Preset Selection UI**
-  - Dropdown, radio buttons, or cards?
-  - Show description on hover?
-  - "Custom" preset when user manually adjusts?
-  - Can users save their custom presets?
+- [ ] **Indexes & Performance**
+  - Index on category for fast filtering
+  - Index on featured status (100+ likes)
+  - Index on createdAt for trending/new pages
+  - Index on like count for popular pages
+  - Composite indexes for common queries
 
-#### 5. Category System
-- [ ] **Category Structure**
-  - Pre-defined categories or user-created?
-  - Suggested categories:
-    - Sports (climbing, hiking, running, etc.)
-    - Gaming (characters, games, streamers, etc.)
-    - Food (restaurants, recipes, snacks, etc.)
-    - Tech (laptops, phones, software, etc.)
-    - Entertainment (movies, shows, books, etc.)
-    - Lifestyle (travel, fashion, home, etc.)
-  - Subcategories? (e.g., Gaming → League of Legends → Champions)
-  - Multiple categories per template?
+- [ ] **Migration Strategy**
+  - Initial schema
+  - Seed data (categories, subcategories)
+  - Test data for development
 
-- [ ] **Category Pages**
-  - What content on category landing pages?
-  - Filter by subcategory?
-  - Sort options?
-  - Featured templates per category?
+#### 2. API Design (Next.js API Routes)
+- [ ] **Template Endpoints**
+  - POST /api/templates (create)
+  - GET /api/templates (browse with filters)
+  - GET /api/templates/[id] (view single)
+  - PUT /api/templates/[id] (update if no references)
+  - POST /api/templates/[id]/version (create new version)
+  - DELETE /api/templates/[id] (delete if no references)
 
-#### 6. Search & Discovery
-- [ ] **Search Functionality**
-  - What can users search? (template titles, items, creators, tags?)
-  - Autocomplete suggestions?
-  - Filters: category, date, popularity, featured status?
-  - Sort by: relevance, recent, popular, likes?
+- [ ] **Tier List Endpoints**
+  - POST /api/tier-lists (create)
+  - GET /api/tier-lists (browse with filters)
+  - GET /api/tier-lists/[id] (view single)
+  - PUT /api/tier-lists/[id] (update own tier list)
+  - DELETE /api/tier-lists/[id] (delete own tier list)
 
-- [ ] **Browse/Discovery Features**
-  - "Trending" tier lists?
-  - "New" tier lists?
-  - "Related" tier lists on template pages?
-  - Personalized recommendations (Phase 2)?
+- [ ] **User Endpoints**
+  - GET /api/users/[id] (public profile)
+  - PUT /api/users/me (update own profile)
+  - GET /api/users/me/templates (my templates)
+  - GET /api/users/me/tier-lists (my tier lists)
+  - GET /api/users/me/likes (liked content)
 
-#### 7. Social Features Details
-- [ ] **Likes System**
-  - One like per user per template?
-  - Unlike functionality?
-  - Show like count publicly?
-  - Notification to creator when liked?
+- [ ] **Social Endpoints**
+  - POST /api/likes (like template or tier list)
+  - DELETE /api/likes/[id] (unlike)
+  - GET /api/featured (templates & tier lists with 100+ likes)
 
-- [ ] **Comments (Phase 2)**
-  - Top-level comments only or threaded?
-  - Markdown support?
-  - Upvote/downvote on comments?
-  - Report comments?
-  - Creator can pin comments?
+- [ ] **Discovery Endpoints**
+  - GET /api/browse/trending (last 7 days)
+  - GET /api/browse/new (last 24-48 hours)
+  - GET /api/browse/popular (all-time)
+  - GET /api/categories (list all)
+  - GET /api/categories/[slug] (category page with infinite scroll)
 
-- [ ] **Sharing**
-  - Share with current weight configuration?
-  - Generate shareable link with weights encoded in URL?
-  - Share as image (with current weights shown)?
-  - Social media preview optimization?
+- [ ] **Error Handling & Validation**
+  - Zod schemas for request validation
+  - Consistent error response format
+  - HTTP status codes
+  - Error logging
 
-#### 8. User Profile & Dashboard
-- [ ] **Creator Profile Page**
-  - What information shown?
-    - Bio/description?
-    - Total templates created?
-    - Total likes received?
-    - Featured template count?
-    - Join date?
-  - List of templates (public only or include drafts?)
-  - Follow/unfollow functionality?
-  - Profile customization?
+- [ ] **Rate Limiting**
+  - Per-user rate limits
+  - Per-IP rate limits for unauthenticated requests
+  - Protect against abuse
 
-- [ ] **User Dashboard (Logged In)**
-  - My Templates tab (published, drafts, featured)
-  - Liked/Favorited templates
-  - Activity feed?
-  - Analytics for creators? (views, likes over time)
-  - Notifications center?
+#### 3. Authentication & Authorization
+- [ ] **Google OAuth Setup**
+  - NextAuth.js configuration
+  - Google OAuth credentials
+  - Session management
+  - JWT strategy
 
-#### 9. Image Upload & Management
-- [ ] **Image Upload Flow**
-  - Drag & drop support?
-  - Paste from clipboard?
-  - Bulk upload multiple images?
-  - Image URL input as alternative?
-  - Preview before upload?
-  - Crop/resize tool in-app?
+- [ ] **Authorization Rules**
+  - Guest: Browse, view, adjust weights (read-only)
+  - Authenticated: Create templates/tier lists, like, share
+  - Owner: Edit/delete own content
+  - Admin: Moderation tools (Phase 2)
 
-- [ ] **Image Library**
-  - Reuse images across templates?
-  - Personal image library per user?
-  - Search for images within platform?
-  - Integration with stock photo APIs? (Unsplash, Pexels)
+- [ ] **Template Limits Enforcement**
+  - Calculate available slots (5 + references bonus)
+  - Block creation if limit reached
+  - Display slot count to users
 
-#### 10. Admin & Moderation Tools
-- [ ] **Admin Dashboard**
-  - Report queue view
-  - User management (ban, warn, etc.)
-  - Template management (feature, unfeature, delete)
-  - Analytics overview
-  - System health monitoring
+#### 4. UI/UX Design & Wireframes
+- [ ] **Design System**
+  - Color palette (dark mode primary)
+  - Typography scale
+  - Spacing system
+  - Component library (buttons, inputs, cards, etc.)
 
-- [ ] **Moderation Actions**
-  - Warn user (send email notification)
-  - Temporary ban (duration options: 1 day, 7 days, 30 days)
-  - Permanent ban
-  - Delete template
-  - Delete comment
-  - Remove featured status
-  - Add featured status manually (override threshold)
+- [ ] **Key Page Wireframes**
+  - Homepage (categories, featured, creators)
+  - Category page (infinite scroll)
+  - Template viewer
+  - Tier list viewer
+  - Template creator flow
+  - Tier list creator flow
+  - User profile page
+
+- [ ] **Interaction Design**
+  - Weight slider behavior
+  - "SQUISH" button animation
+  - Tier transition animations (60fps target)
+  - Mobile responsive breakpoints
+
+#### 5. Core Feature Implementation Order
+- [ ] **Phase 1A: Foundation** (Week 1-2)
+  - Project setup (Next.js 15, Prisma, Tailwind, Supabase)
+  - Database schema and migrations
+  - Google OAuth authentication
+  - Basic routing structure
+
+- [ ] **Phase 1B: Templates** (Week 3-4)
+  - Template creation flow
+  - Template CRUD operations
+  - Image upload (placeholder URLs for MVP, cloud storage Phase 2)
+  - Template browsing and discovery
+
+- [ ] **Phase 1C: Tier Lists** (Week 5-6)
+  - Tier list creation flow
+  - Rating interface
+  - Weight presets definition
+  - Tier visualization
+  - Weight adjustment with sliders
+
+- [ ] **Phase 1D: Social & Polish** (Week 7-8)
+  - Likes system
+  - Sharing functionality
+  - User profiles
+  - Category pages
+  - Browse/discovery pages
+  - Mobile responsive
+
+- [ ] **Phase 1E: Testing & Launch** (Week 9-10)
+  - Performance optimization
+  - Security audit
+  - Bug fixes
+  - Deployment to Vercel
+  - Monitoring setup
 
 ---
 
